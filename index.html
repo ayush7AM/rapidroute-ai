@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RapidRoute AI — Ambulance Route Optimizer</title>
+<style>
+  :root, [data-theme="light"] {
+    --bg: #f3f5f9;
+    --panel: #ffffff;
+    --panel-2: #f7f9fc;
+    --text: #172033;
+    --muted: #5d687c;
+    --border: #e1e6ee;
+    --accent: #dc2638;
+    --accent-soft: #fde7ea;
+    --route: #2563eb;
+    --route-glow: rgba(37, 99, 235, .25);
+    --edge: #b6c0cf;
+    --node: #e8f0ff;
+    --node-stroke: #5b7fc7;
+    --node-route: #dbeafe;
+    --low: #16a34a;
+    --mid: #d97706;
+    --high: #dc2626;
+    --blocked: #9ca3af;
+    --label-bg: rgba(255,255,255,.92);
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 16px rgba(16,24,40,.06);
+    --input-bg: #ffffff;
+    --console-bg: #0f1623;
+    --console-text: #c9d6ea;
+    --grid: #e9edf3;
+  }
+  [data-theme="dark"] {
+    --bg: #0c111a;
+    --panel: #141b27;
+    --panel-2: #19212f;
+    --text: #e5eaf2;
+    --muted: #93a0b5;
+    --border: #253041;
+    --accent: #f0475a;
+    --accent-soft: #3a1820;
+    --route: #60a5fa;
+    --route-glow: rgba(96, 165, 250, .28);
+    --edge: #445267;
+    --node: #1b2b45;
+    --node-stroke: #5b84c9;
+    --node-route: #1e3a66;
+    --low: #22c55e;
+    --mid: #f59e0b;
+    --high: #f87171;
+    --blocked: #6b7280;
+    --label-bg: rgba(20,27,39,.92);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+    --input-bg: #0f1520;
+    --console-bg: #070b12;
+    --console-text: #b8c7de;
+    --grid: #1f2836;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+    transition: background .25s, color .25s;
+  }
+  button, input, select { font: inherit; color: inherit; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 12px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-size: 20px; font-weight: 800;
+  }
+  .brand h1 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+  .brand p { margin: 0; font-size: 12px; color: var(--muted); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 12px; color: var(--muted);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--low); }
+  .dot.busy { background: var(--mid); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .theme-toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel-2);
+    cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .theme-toggle:hover { border-color: var(--node-stroke); }
+  .theme-toggle svg { width: 16px; height: 16px; }
+
+  /* Layout */
+  main {
+    display: grid;
+    grid-template-columns: 330px minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px 24px 28px;
+    max-width: 1480px; margin: 0 auto;
+  }
+  .col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+    min-width: 0;
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 13px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .card h2 .tag {
+    text-transform: none; letter-spacing: 0; font-weight: 600;
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+  /* Controls */
+  .field { margin-bottom: 14px; }
+  .field label { display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .field label span.val { font-variant-numeric: tabular-nums; color: var(--accent); }
+  .field small { color: var(--muted); font-size: 12px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  select, input[type="number"] {
+    width: 100%; padding: 7px 9px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--input-bg);
+  }
+  select:focus, input:focus { outline: 2px solid var(--route-glow); border-color: var(--route); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip-btn {
+    padding: 5px 10px; border-radius: 999px; font-size: 12px;
+    border: 1px solid var(--border); background: var(--panel-2); cursor: pointer;
+  }
+  .chip-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn {
+    width: 100%; padding: 11px 14px; border-radius: 10px; border: 0;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 14px;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .08s, filter .15s;
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn:active { transform: scale(.98); }
+  .btn.secondary {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  }
+  .btn.secondary:hover { border-color: var(--node-stroke); }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .btn.small { padding: 7px 10px; font-size: 12.5px; }
+
+  /* Training table */
+  .train-wrap { max-height: 250px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: var(--panel-2); color: var(--muted); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  .train-wrap input[type="number"] { padding: 3px 5px; border-radius: 6px; font-size: 12px; min-width: 46px; }
+  .icon-btn {
+    border: 0; background: transparent; cursor: pointer; color: var(--muted);
+    font-size: 15px; padding: 2px 6px; border-radius: 6px;
+  }
+  .icon-btn:hover { color: var(--accent); background: var(--accent-soft); }
+  .importance { margin-top: 12px; }
+  .imp-row { display: grid; grid-template-columns: 92px 1fr 44px; align-items: center; gap: 8px; margin: 6px 0; font-size: 12.5px; }
+  .imp-bar { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--border); }
+  .imp-bar > div { height: 100%; background: var(--route); border-radius: 4px; transition: width .4s; }
+  .imp-row .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .model-meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  /* Map */
+  .map-card { padding-bottom: 10px; }
+  .map-wrap { position: relative; width: 100%; }
+  #map { width: 100%; height: auto; display: block; user-select: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 22px; height: 4px; border-radius: 2px; display: inline-block; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .edge-hit { cursor: pointer; }
+  .node-g { cursor: pointer; }
+  .node-g:hover circle { stroke-width: 3.5; }
+
+  /* Results */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .stat {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .stat .k { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .stat .v { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; letter-spacing: -.02em; }
+  .stat .v small { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .stat .s { font-size: 12px; color: var(--muted); }
+  .stat.good .v { color: var(--low); }
+  .stat.hot .v { color: var(--accent); }
+  .route-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 14px; }
+  .route-line .lbl { font-size: 12px; color: var(--muted); font-weight: 600; margin-right: 4px; min-width: 112px; }
+  .rchip {
+    padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+    background: var(--node-route); border: 1px solid var(--route); color: var(--text);
+  }
+  .rchip.alt { background: var(--panel-2); border-color: var(--border); font-weight: 600; }
+  .arrow { color: var(--muted); }
+  .alert {
+    margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13px; display: none;
+  }
+
+  /* Edge table */
+  .edge-table td.num, .edge-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .edge-table tr.on-route td { background: var(--route-glow); font-weight: 600; }
+  .edge-table tr.blocked td { color: var(--muted); text-decoration: line-through; }
+  .cong { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; }
+  .table-scroll { overflow-x: auto; }
+
+  /* Console */
+  .console {
+    background: var(--console-bg); color: var(--console-text);
+    border-radius: 10px; padding: 10px 12px; height: 300px; overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px;
+  }
+  .console .ln { white-space: pre-wrap; margin: 1px 0; }
+  .console .t { color: #6b7d99; }
+  .console .urgent { color: #ff7b89; font-weight: 700; }
+  .console .ok { color: #6ee7a0; }
+  .console .info { color: #7cc4ff; }
+
+  /* Chart */
+  #chart { width: 100%; height: auto; display: block; }
+  .chart-pt { cursor: pointer; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 24px 24px; }
+
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .row2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    header { padding: 10px 14px; }
+    main { padding: 14px; }
+    .brand p, .status-pill { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">+</div>
+    <div>
+      <h1>RapidRoute AI</h1>
+      <p>Ambulance dispatch with machine-learned traffic prediction</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">Ready</span></div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle light and dark mode">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+      <span id="themeLabel">Dark</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT COLUMN -->
+  <div class="col">
+    <div class="card">
+      <h2>Dispatch <span class="tag" id="condTag">Rush hour</span></h2>
+
+      <div class="presets">
+        <button class="chip-btn" data-h="17" data-w="8">Rush hour + storm</button>
+        <button class="chip-btn" data-h="8" data-w="2">Morning commute</button>
+        <button class="chip-btn" data-h="12" data-w="5">Midday rain</button>
+        <button class="chip-btn" data-h="2" data-w="0">Night, clear</button>
+      </div>
+
+      <div class="field">
+        <label for="hour">Time of day <span class="val" id="hourVal">17:00</span></label>
+        <input type="range" id="hour" min="0" max="23" step="1" value="17">
+      </div>
+      <div class="field">
+        <label for="weather">Weather severity <span class="val" id="weatherVal">8 / 10</span></label>
+        <input type="range" id="weather" min="0" max="10" step="1" value="8">
+        <small id="weatherDesc">Heavy storm</small>
+      </div>
+      <div class="two field">
+        <div>
+          <label for="src">From</label>
+          <select id="src"></select>
+        </div>
+        <div>
+          <label for="dst">To</label>
+          <select id="dst"></select>
+        </div>
+      </div>
+
+      <button class="btn" id="dispatchBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Dispatch ambulance
+      </button>
+      <div class="btn-row">
+        <button class="btn secondary small" id="playBtn">▶ Simulate 24 h</button>
+        <button class="btn secondary small" id="clearBlocksBtn">Reopen all roads</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Traffic model <span class="tag">Random Forest</span></h2>
+      <div class="two field">
+        <div>
+          <label for="nEst">Trees</label>
+          <input type="number" id="nEst" min="1" max="300" value="50">
+        </div>
+        <div>
+          <label for="seed">Random seed</label>
+          <input type="number" id="seed" min="0" max="99999" value="42">
+        </div>
+      </div>
+
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px;">Training data</div>
+      <div class="train-wrap">
+        <table id="trainTable">
+          <thead><tr><th>Hour</th><th>Weather</th><th>Capacity</th><th>Congestion</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary small" id="addRowBtn">+ Add sample</button>
+        <button class="btn secondary small" id="resetDataBtn">Reset data</button>
+      </div>
+      <button class="btn small" id="retrainBtn" style="margin-top:8px;">Retrain model</button>
+
+      <div class="importance" id="importance"></div>
+      <div class="model-meta" id="modelMeta"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div class="col">
+    <div class="card map-card">
+      <h2>City network <span class="tag" id="mapTag">AI-optimized route</span></h2>
+      <div class="map-wrap">
+        <svg id="map" viewBox="0 0 900 520" role="img" aria-label="City road network with optimal ambulance route"></svg>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--route);height:6px"></i>Optimal route</span>
+        <span><i class="sw" style="background:var(--low)"></i>Light traffic (&lt;1.5×)</span>
+        <span><i class="sw" style="background:var(--mid)"></i>Moderate (1.5–2.2×)</span>
+        <span><i class="sw" style="background:var(--high)"></i>Heavy (&gt;2.2×)</span>
+        <span><i class="sw" style="background:repeating-linear-gradient(90deg,var(--blocked) 0 4px,transparent 4px 7px)"></i>Closed</span>
+      </div>
+      <div class="hint" style="margin-top:6px;">Click a road to close or reopen it. Click an intersection to send the ambulance there.</div>
+    </div>
+
+    <div class="card">
+      <h2>Dispatch result <span class="tag" id="resultTag">—</span></h2>
+      <div class="stats">
+        <div class="stat hot"><div class="k">AI ETA</div><div class="v" id="etaVal">—</div><div class="s" id="etaSub">minutes</div></div>
+        <div class="stat"><div class="k">Naive route ETA</div><div class="v" id="naiveVal">—</div><div class="s" id="naiveSub">shortest in clear traffic</div></div>
+        <div class="stat good"><div class="k">Time saved</div><div class="v" id="savedVal">—</div><div class="s" id="savedSub">vs naive route</div></div>
+        <div class="stat"><div class="k">Avg. congestion</div><div class="v" id="congVal">—</div><div class="s">across the network</div></div>
+      </div>
+      <div class="route-line" id="aiRoute"></div>
+      <div class="route-line" id="naiveRoute"></div>
+      <div class="alert" id="alertBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>ETA over 24 hours <span class="tag" id="chartTag">weather 8/10</span></h2>
+      <svg id="chart" viewBox="0 0 900 250"></svg>
+      <div class="hint">Click a point to dispatch at that hour.</div>
+    </div>
+
+    <div class="row2">
+      <div class="card">
+        <h2>Road segments <span class="tag" id="edgeTag">10 roads</span></h2>
+        <div class="table-scroll">
+          <table class="edge-table" id="edgeTable">
+            <thead><tr><th>Road</th><th class="num">Base</th><th class="num">Cap.</th><th class="num">Traffic</th><th class="num">Predicted</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Dispatch log <button class="chip-btn" id="clearLogBtn" style="text-transform:none;letter-spacing:0">Clear</button></h2>
+        <div class="console" id="console"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>Synthetic city and training data. Travel time = base time × predicted congestion; routes are found with Dijkstra's algorithm.</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  /* =========================================================
+     Data (mirrors the original Python)
+     ========================================================= */
+  const DEFAULT_TRAIN = [
+    [8, 2, 100, 1.5], [17, 8, 50, 2.8], [2, 0, 150, 1.0], [12, 5, 80, 1.8],
+    [9, 9, 60, 2.5], [23, 1, 120, 1.1], [18, 10, 40, 3.0], [14, 3, 90, 1.4]
+  ];
+  const ROADS = [
+    ['Hospital', 'A', 5, 100], ['Hospital', 'B', 8, 120],
+    ['A', 'C', 6, 60], ['A', 'D', 12, 80],
+    ['B', 'D', 7, 90], ['B', 'E', 15, 150],
+    ['C', 'Patient', 10, 50], ['D', 'Patient', 8, 70],
+    ['E', 'Patient', 12, 110], ['C', 'D', 4, 40]
+  ];
+  const POS = {
+    Hospital: [0, 5], A: [2, 8], B: [2, 2],
+    C: [5, 9], D: [5, 5], E: [5, 1], Patient: [8, 5]
+  };
+  const NODES = Object.keys(POS);
+  const FEATURES = ['Hour of day', 'Weather', 'Road capacity'];
+
+  /* =========================================================
+     Seeded RNG
+     ========================================================= */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* =========================================================
+     Random Forest Regressor (CART trees, bootstrap, MSE)
+     ========================================================= */
+  class RandomForestRegressor {
+    constructor(nEstimators = 50, randomState = 42) {
+      this.nEstimators = nEstimators;
+      this.randomState = randomState;
+      this.trees = [];
+      this.featureImportances = [];
+    }
+    fit(X, y) {
+      const rng = mulberry32(this.randomState);
+      const nF = X[0].length;
+      const totalImp = new Array(nF).fill(0);
+      this.trees = [];
+      for (let t = 0; t < this.nEstimators; t++) {
+        const idx = [];
+        for (let i = 0; i < X.length; i++) idx.push(Math.floor(rng() * X.length));
+        const imp = new Array(nF).fill(0);
+        const order = [...Array(nF).keys()];
+        this.trees.push(this._build(X, y, idx, imp, rng, order));
+        const s = imp.reduce((a, b) => a + b, 0);
+        if (s > 0) imp.forEach((v, i) => totalImp[i] += v / s);
+      }
+      const s = totalImp.reduce((a, b) => a + b, 0) || 1;
+      this.featureImportances = totalImp.map(v => v / s);
+      return this;
+    }
+    _build(X, y, idx, imp, rng, order) {
+      const n = idx.length;
+      let mean = 0; for (const i of idx) mean += y[i]; mean /= n;
+      let sse = 0; for (const i of idx) sse += (y[i] - mean) ** 2;
+      if (n < 2 || sse < 1e-12) return { v: mean };
+
+      // shuffle feature order (like sklearn) to break ties randomly
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]];
+      }
+      let best = null;
+      for (const f of order) {
+        const vals = [...new Set(idx.map(i => X[i][f]))].sort((a, b) => a - b);
+        for (let k = 0; k < vals.length - 1; k++) {
+          const thr = (vals[k] + vals[k + 1]) / 2;
+          let nl = 0, sl = 0, ql = 0, nr = 0, sr = 0, qr = 0;
+          for (const i of idx) {
+            const yi = y[i];
+            if (X[i][f] <= thr) { nl++; sl += yi; ql += yi * yi; }
+            else { nr++; sr += yi; qr += yi * yi; }
+          }
+          const sseL = ql - sl * sl / nl, sseR = qr - sr * sr / nr;
+          const gain = sse - (sseL + sseR);
+          if (!best || gain > best.gain + 1e-12) best = { f, thr, gain };
+        }
+      }
+      if (!best || best.gain <= 1e-12) return { v: mean };
+      imp[best.f] += best.gain;
+      const L = idx.filter(i => X[i][best.f] <= best.thr);
+      const R = idx.filter(i => X[i][best.f] > best.thr);
+      return { f: best.f, thr: best.thr, l: this._build(X, y, L, imp, rng, order), r: this._build(X, y, R, imp, rng, order) };
+    }
+    _predictTree(node, x) {
+      while (node.v === undefined) node = x[node.f] <= node.thr ? node.l : node.r;
+      return node.v;
+    }
+    predict(x) {
+      let s = 0;
+      for (const t of this.trees) s += this._predictTree(t, x);
+      return s / this.trees.length;
+    }
+    depthStats() {
+      const d = n => n.v !== undefined ? 0 : 1 + Math.max(d(n.l), d(n.r));
+      const leaves = n => n.v !== undefined ? 1 : leaves(n.l) + leaves(n.r);
+      const depths = this.trees.map(d), lv = this.trees.map(leaves);
+      return { avgDepth: depths.reduce((a, b) => a + b, 0) / depths.length, avgLeaves: lv.reduce((a, b) => a + b, 0) / lv.length };
+    }
+  }
+
+  /* =========================================================
+     Graph + Dijkstra
+     ========================================================= */
+  const ekey = (u, v) => [u, v].sort().join('|');
+  const round2 = x => Math.round(x * 100) / 100;
+
+  function computeEdges(model, hour, weather) {
+    return ROADS.map(([u, v, base, cap]) => {
+      const congestion = model.predict([hour, weather, cap]);
+      return { u, v, base, cap, key: ekey(u, v), congestion: round2(congestion), dyn: round2(base * congestion) };
+    });
+  }
+
+  function dijkstra(edges, src, dst, weightFn, blocked) {
+    const adj = {}; NODES.forEach(n => adj[n] = []);
+    for (const e of edges) {
+      if (blocked.has(e.key)) continue;
+      const w = weightFn(e);
+      adj[e.u].push([e.v, w]); adj[e.v].push([e.u, w]);
+    }
+    const dist = {}, prev = {}, done = new Set();
+    NODES.forEach(n => dist[n] = Infinity);
+    dist[src] = 0;
+    while (true) {
+      let cur = null, best = Infinity;
+      for (const n of NODES) if (!done.has(n) && dist[n] < best) { best = dist[n]; cur = n; }
+      if (cur === null) break;
+      if (cur === dst) break;
+      done.add(cur);
+      for (const [nb, w] of adj[cur]) {
+        if (dist[cur] + w < dist[nb]) { dist[nb] = dist[cur] + w; prev[nb] = cur; }
+      }
+    }
+    if (dist[dst] === Infinity) return null;
+    const path = [dst];
+    while (path[0] !== src) path.unshift(prev[path[0]]);
+    return { path, dist: round2(dist[dst]) };
+  }
+
+  function pathCost(path, edges) {
+    const m = {}; edges.forEach(e => m[e.key] = e);
+    let s = 0;
+    for (let i = 0; i < path.length - 1; i++) s += m[ekey(path[i], path[i + 1])].dyn;
+    return round2(s);
+  }
+
+  /* =========================================================
+     State
+     ========================================================= */
+  const state = {
+    hour: 17, weather: 8, src: 'Hospital', dst: 'Patient',
+    blocked: new Set(),
+    train: DEFAULT_TRAIN.map(r => r.slice()),
+    model: null, edges: [], ai: null, naive: null,
+    playing: false, playTimer: null, anim: null
+  };
+
+  const $ = id => document.getElementById(id);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs = {}, parent) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const congColor = c => c < 1.5 ? 'var(--low)' : c < 2.2 ? 'var(--mid)' : 'var(--high)';
+  const pad = n => String(n).padStart(2, '0');
+
+  function weatherLabel(w) {
+    return ['Clear skies', 'Clear', 'Light clouds', 'Overcast', 'Light rain', 'Rain',
+      'Heavy rain', 'Thunderstorm', 'Heavy storm', 'Severe storm', 'Extreme weather'][w];
+  }
+  function periodLabel(h) {
+    if (h >= 7 && h <= 9) return 'Morning rush';
+    if (h >= 16 && h <= 19) return 'Evening rush';
+    if (h >= 22 || h <= 5) return 'Night';
+    return 'Off-peak';
+  }
+
+  /* =========================================================
+     Logging
+     ========================================================= */
+  function log(msg, cls = '') {
+    const c = $('console');
+    const d = new Date();
+    const line = document.createElement('div');
+    line.className = 'ln';
+    line.innerHTML = `<span class="t">[${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}]</span> <span class="${cls}"></span>`;
+    line.lastChild.textContent = msg;
+    c.appendChild(line);
+    while (c.children.length > 150) c.removeChild(c.firstChild);
+    c.scrollTop = c.scrollHeight;
+  }
+
+  function setStatus(text, busy) {
+    $('statusText').textContent = text;
+    $('statusDot').classList.toggle('busy', !!busy);
+  }
+
+  /* =========================================================
+     Training
+     ========================================================= */
+  function renderTrainTable() {
+    const tb = $('trainTable').querySelector('tbody');
+    tb.innerHTML = '';
+    state.train.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      const specs = [[0, 23, 1], [0, 10, 1], [10, 300, 1], [0.5, 5, 0.1]];
+      row.forEach((val, j) => {
+        const td = document.createElement('td');
+        const inp = document.createElement('input');
+        inp.type = 'number'; inp.min = specs[j][0]; inp.max = specs[j][1]; inp.step = specs[j][2]; inp.value = val;
+        inp.addEventListener('change', () => {
+          let v = parseFloat(inp.value);
+          if (isNaN(v)) v = specs[j][0];
+          v = Math.min(specs[j][1], Math.max(specs[j][0], v));
+          inp.value = v;
+          state.train[i][j] = v;
+        });
+        td.appendChild(inp); tr.appendChild(td);
+      });
+      const td = document.createElement('td');
+      const b = document.createElement('button');
+      b.className = 'icon-btn'; b.title = 'Remove sample'; b.textContent = '×';
+      b.addEventListener('click', () => {
+        if (state.train.length <= 2) { log('Need at least 2 training samples.', 'urgent'); return; }
+        state.train.splice(i, 1); renderTrainTable();
+      });
+      td.appendChild(b); tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+  }
+
+  function trainModel() {
+    setStatus('Training model…', true);
+    const n = Math.max(1, Math.min(300, parseInt($('nEst').value) || 50));
+    const seed = Math.max(0, parseInt($('seed').value) || 0);
+    $('nEst').value = n; $('seed').value = seed;
+    const X = state.train.map(r => r.slice(0, 3));
+    const y = state.train.map(r => r[3]);
+    const t0 = performance.now();
+    state.model = new RandomForestRegressor(n, seed).fit(X, y);
+    const ms = performance.now() - t0;
+
+    log(`Training AI Traffic Predictor... (${n} trees, ${X.length} samples, seed ${seed})`, 'info');
+    const preds = X.map(x => state.model.predict(x));
+    const mae = preds.reduce((s, p, i) => s + Math.abs(p - y[i]), 0) / y.length;
+    const st = state.model.depthStats();
+    $('modelMeta').textContent = `Trained in ${ms.toFixed(1)} ms · training MAE ${mae.toFixed(3)} · avg depth ${st.avgDepth.toFixed(1)} · avg leaves ${st.avgLeaves.toFixed(1)}`;
+    log(`Model ready. Training MAE = ${mae.toFixed(3)}`, 'ok');
+
+    const imp = $('importance');
+    imp.innerHTML = '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">Feature importance</div>';
+    state.model.featureImportances.forEach((v, i) => {
+      const r = document.createElement('div'); r.className = 'imp-row';
+      r.innerHTML = `<span>${FEATURES[i]}</span><div class="imp-bar"><div style="width:${(v * 100).toFixed(1)}%"></div></div><span class="num">${(v * 100).toFixed(0)}%</span>`;
+      imp.appendChild(r);
+    });
+    setStatus('Ready', false);
+  }
+
+  /* =========================================================
+     Dispatch
+     ========================================================= */
+  function dispatch(opts = {}) {
+    const { quiet = false, animate = true } = opts;
+    const { hour, weather, src, dst, blocked } = state;
+    state.edges = computeEdges(state.model, hour, weather);
+    state.ai = dijkstra(state.edges, src, dst, e => e.dyn, blocked);
+    const naiveRaw = dijkstra(state.edges, src, dst, e => e.base, blocked);
+    state.naive = naiveRaw ? { path: naiveRaw.path, dist: pathCost(naiveRaw.path, state.edges) } : null;
+
+    if (!quiet) {
+      log(`Dispatching Ambulance at ${hour}:00 with weather severity ${weather}/10...`, 'info');
+      if (state.ai) {
+        log(`[URGENT] Optimal Route Found: ${state.ai.path.join(' -> ')}`, 'urgent');
+        log(`Estimated Travel Time: ${state.ai.dist.toFixed(2)} minutes`, 'ok');
+        if (state.naive && state.naive.path.join() !== state.ai.path.join()) {
+          log(`AI avoided ${state.naive.path.join(' -> ')} (would take ${state.naive.dist.toFixed(2)} min)`, '');
+        }
+      } else {
+        log(`No route available from ${src} to ${dst}: all paths blocked.`, 'urgent');
+      }
+    }
+    renderMap(animate);
+    renderResults();
+    renderEdgeTable();
+    renderChart();
+  }
+
+  /* =========================================================
+     Map rendering
+     ========================================================= */
+  const MAP = { W: 900, H: 520, mx: 70, my: 50 };
+  const px = ([x, y]) => [MAP.mx + x * (MAP.W - 2 * MAP.mx) / 8, MAP.H - MAP.my - y * (MAP.H - 2 * MAP.my) / 9];
+
+  function renderMap(animate) {
+    const svg = $('map');
+    if (state.anim) cancelAnimationFrame(state.anim);
+    svg.innerHTML = '';
+
+    const defs = el('defs', {}, svg);
+    const f = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+    el('feGaussianBlur', { stdDeviation: '5', result: 'b' }, f);
+    const mg = el('feMerge', {}, f); el('feMergeNode', { in: 'b' }, mg); el('feMergeNode', { in: 'SourceGraphic' }, mg);
+
+    // subtle grid
+    const grid = el('g', { opacity: .6 }, svg);
+    for (let x = 0; x <= 8; x++) { const [a] = px([x, 0]); el('line', { x1: a, y1: 20, x2: a, y2: MAP.H - 20, stroke: 'var(--grid)', 'stroke-width': 1 }, grid); }
+    for (let y = 0; y <= 9; y++) { const [, b] = px([0, y]); el('line', { x1: 20, y1: b, x2: MAP.W - 20, y2: b, stroke: 'var(--grid)', 'stroke-width': 1 }, grid); }
+
+    const routeKeys = new Set();
+    if (state.ai) for (let i = 0; i < state.ai.path.length - 1; i++) routeKeys.add(ekey(state.ai.path[i], state.ai.path[i + 1]));
+
+    const gEdges = el('g', {}, svg), gRoute = el('g', {}, svg), gLabels = el('g', {}, svg), gNodes = el('g', {}, svg);
+
+    for (const e of state.edges) {
+      const [x1, y1] = px(POS[e.u]), [x2, y2] = px(POS[e.v]);
+      const isBlocked = state.blocked.has(e.key);
+      el('line', {
+        x1, y1, x2, y2,
+        stroke: isBlocked ? 'var(--blocked)' : congColor(e.congestion),
+        'stroke-width': isBlocked ? 3 : 5, 'stroke-linecap': 'round',
+        'stroke-dasharray': isBlocked ? '8 7' : '', opacity: isBlocked ? .7 : .85
+      }, gEdges);
+      const hit = el('line', { x1, y1, x2, y2, stroke: 'transparent', 'stroke-width': 22, class: 'edge-hit' }, gEdges);
+      const tt = el('title', {}, hit);
+      tt.textContent = `${e.u} ↔ ${e.v}\nBase ${e.base} min · capacity ${e.cap}\nPredicted ${e.dyn} min (×${e.congestion})\n${isBlocked ? 'Click to reopen' : 'Click to close road'}`;
+      hit.addEventListener('click', () => toggleBlock(e));
+
+      if (routeKeys.has(e.key)) {
+        el('line', { x1, y1, x2, y2, stroke: 'var(--route)', 'stroke-width': 11, 'stroke-linecap': 'round', filter: 'url(#glow)', opacity: .95, 'pointer-events': 'none' }, gRoute);
+      }
+
+      // label
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const lg = el('g', { transform: `translate(${mx},${my})`, 'pointer-events': 'none' }, gLabels);
+      el('rect', { x: -33, y: -17, width: 66, height: 34, rx: 7, fill: 'var(--label-bg)', stroke: routeKeys.has(e.key) ? 'var(--route)' : 'var(--border)', 'stroke-width': routeKeys.has(e.key) ? 1.5 : 1 }, lg);
+      const t1 = el('text', { x: 0, y: -2, 'text-anchor': 'middle', 'font-size': 12.5, 'font-weight': 700, fill: isBlocked ? 'var(--muted)' : 'var(--text)' }, lg);
+      t1.textContent = isBlocked ? 'CLOSED' : `${e.dyn.toFixed(1)}m`;
+      const t2 = el('text', { x: 0, y: 12, 'text-anchor': 'middle', 'font-size': 10.5, 'font-weight': 600, fill: isBlocked ? 'var(--muted)' : congColor(e.congestion) }, lg);
+      t2.textContent = isBlocked ? `was ${e.base}m` : `×${e.congestion.toFixed(2)}`;
+    }
+
+    const onRoute = new Set(state.ai ? state.ai.path : []);
+    for (const n of NODES) {
+      const [x, y] = px(POS[n]);
+      const g = el('g', { class: 'node-g', transform: `translate(${x},${y})` }, gNodes);
+      const isSrc = n === state.src, isDst = n === state.dst;
+      const r = (isSrc || isDst) ? 30 : 24;
+      el('circle', {
+        r, fill: isSrc ? 'var(--accent)' : isDst ? 'var(--route)' : onRoute.has(n) ? 'var(--node-route)' : 'var(--node)',
+        stroke: isSrc ? 'var(--accent)' : onRoute.has(n) ? 'var(--route)' : 'var(--node-stroke)', 'stroke-width': 2.5
+      }, g);
+      const label = el('text', { 'text-anchor': 'middle', y: 4.5, 'font-size': (isSrc || isDst) ? 11 : 14, 'font-weight': 800, fill: (isSrc || isDst) ? '#fff' : 'var(--text)' }, g);
+      label.textContent = n;
+      const tt = el('title', {}, g); tt.textContent = isSrc ? `${n} (start)` : `Click to dispatch to ${n}`;
+      g.addEventListener('click', () => {
+        if (n === state.src) return;
+        state.dst = n; $('dst').value = n; syncSelects(); dispatch();
+      });
+    }
+
+    // ambulance marker
+    if (state.ai && animate) animateAmbulance(svg);
+    else if (state.ai) {
+      const [x, y] = px(POS[state.ai.path[state.ai.path.length - 1]]);
+      drawAmbulance(svg, x, y - 44);
+    }
+  }
+
+  function drawAmbulance(svg, x, y) {
+    const g = el('g', { transform: `translate(${x},${y})`, 'pointer-events': 'none' }, svg);
+    el('rect', { x: -17, y: -11, width: 34, height: 22, rx: 5, fill: '#ffffff', stroke: 'var(--accent)', 'stroke-width': 2 }, g);
+    el('rect', { x: -4, y: -7, width: 8, height: 14, fill: 'var(--accent)' }, g);
+    el('rect', { x: -7, y: -4, width: 14, height: 8, fill: 'var(--accent)' }, g);
+    el('circle', { cx: -9, cy: 12, r: 3.5, fill: '#333' }, g);
+    el('circle', { cx: 9, cy: 12, r: 3.5, fill: '#333' }, g);
+    return g;
+  }
+
+  function animateAmbulance(svg) {
+    const path = state.ai.path;
+    const m = {}; state.edges.forEach(e => m[e.key] = e);
+    const segs = [];
+    let total = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      const w = m[ekey(path[i], path[i + 1])].dyn;
+      segs.push({ a: px(POS[path[i]]), b: px(POS[path[i + 1]]), w, start: total });
+      total += w;
+    }
+    const duration = state.playing ? 700 : 2400;
+    const amb = drawAmbulance(svg, segs[0].a[0], segs[0].a[1]);
+    const t0 = performance.now();
+    const step = now => {
+      const p = Math.min(1, (now - t0) / duration);
+      const ease = p < .5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      const tm = ease * total;
+      let s = segs[segs.length - 1];
+      for (const sg of segs) if (tm <= sg.start + sg.w) { s = sg; break; }
+      const k = Math.min(1, Math.max(0, (tm - s.start) / s.w));
+      const x = s.a[0] + (s.b[0] - s.a[0]) * k, y = s.a[1] + (s.b[1] - s.a[1]) * k;
+      amb.setAttribute('transform', `translate(${x},${y - (p >= 1 ? 44 : 0)})`);
+      if (p < 1) state.anim = requestAnimationFrame(step);
+      else setStatus('Ambulance arrived', false);
+    };
+    setStatus('En route…', true);
+    state.anim = requestAnimationFrame(step);
+  }
+
+  function toggleBlock(e) {
+    if (state.blocked.has(e.key)) { state.blocked.delete(e.key); log(`Road reopened: ${e.u} ↔ ${e.v}`, 'ok'); }
+    else { state.blocked.add(e.key); log(`Road closed: ${e.u} ↔ ${e.v}. Re-routing...`, 'urgent'); }
+    dispatch();
+  }
+
+  /* =========================================================
+     Results panel
+     ========================================================= */
+  function chips(container, label, path, alt) {
+    container.innerHTML = '';
+    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = label; container.appendChild(l);
+    if (!path) { const s = document.createElement('span'); s.textContent = 'No route'; s.style.color = 'var(--accent)'; container.appendChild(s); return; }
+    path.forEach((n, i) => {
+      if (i) { const a = document.createElement('span'); a.className = 'arrow'; a.textContent = '→'; container.appendChild(a); }
+      const c = document.createElement('span'); c.className = 'rchip' + (alt ? ' alt' : ''); c.textContent = n; container.appendChild(c);
+    });
+  }
+
+  function renderResults() {
+    const { ai, naive, edges, hour, weather } = state;
+    $('resultTag').textContent = `${pad(hour)}:00 · ${weatherLabel(weather)}`;
+    const avg = edges.filter(e => !state.blocked.has(e.key)).reduce((s, e, _, a) => s + e.congestion / a.length, 0);
+    $('congVal').innerHTML = `${avg.toFixed(2)}<small>×</small>`;
+    const alert = $('alertBox');
+
+    if (!ai) {
+      $('etaVal').textContent = '—'; $('naiveVal').textContent = '—'; $('savedVal').textContent = '—';
+      $('etaSub').textContent = 'unreachable';
+      chips($('aiRoute'), 'AI route', null); chips($('naiveRoute'), 'Naive route', null, true);
+      alert.style.display = 'block';
+      alert.textContent = `No path from ${state.src} to ${state.dst}. Reopen a road to restore access.`;
+      return;
+    }
+    $('etaVal').innerHTML = `${ai.dist.toFixed(1)}<small> min</small>`;
+    $('etaSub').textContent = `${ai.path.length - 1} road segments`;
+    $('naiveVal').innerHTML = `${naive.dist.toFixed(1)}<small> min</small>`;
+    const saved = round2(naive.dist - ai.dist);
+    $('savedVal').innerHTML = `${saved.toFixed(1)}<small> min</small>`;
+    $('savedSub').textContent = saved > 0 ? `${((saved / naive.dist) * 100).toFixed(0)}% faster than naive route` : 'Same route as naive choice';
+    chips($('aiRoute'), 'AI route', ai.path);
+    chips($('naiveRoute'), 'Naive route', naive.path, true);
+
+    const heavy = ai.path.slice(0, -1).some((n, i) => {
+      const e = edges.find(x => x.key === ekey(n, ai.path[i + 1])); return e.congestion > 2.2;
+    });
+    if (heavy) {
+      alert.style.display = 'block';
+      alert.textContent = 'Heavy congestion on the best available route. Consider requesting a police escort.';
+    } else alert.style.display = 'none';
+  }
+
+  /* =========================================================
+     Edge table
+     ========================================================= */
+  function renderEdgeTable() {
+    const tb = $('edgeTable').querySelector('tbody');
+    tb.innerHTML = '';
+    const routeKeys = new Set();
+    if (state.ai) for (let i = 0; i < state.ai.path.length - 1; i++) routeKeys.add(ekey(state.ai.path[i], state.ai.path[i + 1]));
+    const rows = [...state.edges].sort((a, b) => (routeKeys.has(b.key) - routeKeys.has(a.key)) || a.dyn - b.dyn);
+    for (const e of rows) {
+      const tr = document.createElement('tr');
+      if (routeKeys.has(e.key)) tr.className = 'on-route';
+      if (state.blocked.has(e.key)) tr.className = 'blocked';
+      tr.style.cursor = 'pointer';
+      tr.title = 'Click to close/reopen this road';
+      tr.innerHTML = `<td>${e.u} ↔ ${e.v}</td><td class="num">${e.base}m</td><td class="num">${e.cap}</td>
+        <td class="num"><span class="cong" style="background:${congColor(e.congestion)}">×${e.congestion.toFixed(2)}</span></td>
+        <td class="num">${e.dyn.toFixed(2)}m</td>`;
+      tr.addEventListener('click', () => toggleBlock(e));
+      tb.appendChild(tr);
+    }
+    $('edgeTag').textContent = `${state.edges.length - state.blocked.size} open / ${state.edges.length}`;
+  }
+
+  /* =========================================================
+     24h chart
+     ========================================================= */
+  function renderChart() {
+    const svg = $('chart'); svg.innerHTML = '';
+    const W = 900, H = 250, L = 50, R = 20, T = 20, B = 36;
+    const ai = [], nv = [];
+    for (let h = 0; h < 24; h++) {
+      const edges = computeEdges(state.model, h, state.weather);
+      const a = dijkstra(edges, state.src, state.dst, e => e.dyn, state.blocked);
+      const n = dijkstra(edges, state.src, state.dst, e => e.base, state.blocked);
+      ai.push(a ? a.dist : null);
+      nv.push(n ? pathCost(n.path, edges) : null);
+    }
+    $('chartTag').textContent = `${state.src} → ${state.dst} · weather ${state.weather}/10`;
+    const vals = [...ai, ...nv].filter(v => v != null);
+    if (!vals.length) {
+      const t = el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: 'var(--muted)' }, svg); t.textContent = 'No route available'; return;
+    }
+    const maxV = Math.ceil(Math.max(...vals) / 10) * 10, minV = Math.max(0, Math.floor(Math.min(...vals) / 10) * 10 - 10);
+    const sx = h => L + h * (W - L - R) / 23, sy = v => H - B - (v - minV) / (maxV - minV || 1) * (H - T - B);
+
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const v = minV + (maxV - minV) * i / steps, y = sy(v);
+      el('line', { x1: L, x2: W - R, y1: y, y2: y, stroke: 'var(--grid)' }, svg);
+      const t = el('text', { x: L - 8, y: y + 4, 'text-anchor': 'end', 'font-size': 11, fill: 'var(--muted)' }, svg); t.textContent = Math.round(v);
+    }
+    for (let h = 0; h < 24; h += 3) {
+      const t = el('text', { x: sx(h), y: H - B + 18, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--muted)' }, svg); t.textContent = `${pad(h)}:00`;
+    }
+    const yl = el('text', { x: 14, y: T + (H - T - B) / 2, 'font-size': 11, fill: 'var(--muted)', transform: `rotate(-90 14 ${T + (H - T - B) / 2})`, 'text-anchor': 'middle' }, svg); yl.textContent = 'ETA (min)';
+
+    // current hour marker
+    el('rect', { x: sx(state.hour) - 12, y: T, width: 24, height: H - T - B, fill: 'var(--accent-soft)', rx: 4 }, svg);
+
+    const line = (arr, color, dash, width) => {
+      let d = ''; arr.forEach((v, h) => { if (v == null) return; d += (d ? 'L' : 'M') + sx(h) + ' ' + sy(v); });
+      el('path', { d, fill: 'none', stroke: color, 'stroke-width': width, 'stroke-dasharray': dash, 'stroke-linejoin': 'round' }, svg);
+    };
+    line(nv, 'var(--muted)', '6 5', 2);
+    line(ai, 'var(--route)', '', 3);
+
+    ai.forEach((v, h) => {
+      if (v == null) return;
+      const c = el('circle', { cx: sx(h), cy: sy(v), r: h === state.hour ? 6.5 : 4, fill: h === state.hour ? 'var(--accent)' : 'var(--route)', stroke: 'var(--panel)', 'stroke-width': 2, class: 'chart-pt' }, svg);
+      const tt = el('title', {}, c); tt.textContent = `${pad(h)}:00 — AI ETA ${v.toFixed(1)} min · naive ${nv[h].toFixed(1)} min`;
+      c.addEventListener('click', () => { setHour(h); dispatch(); });
+    });
+
+    // legend
+    const lg = el('g', { transform: `translate(${W - R - 250},${T - 4})` }, svg);
+    el('line', { x1: 0, x2: 22, y1: 0, y2: 0, stroke: 'var(--route)', 'stroke-width': 3 }, lg);
+    el('text', { x: 28, y: 4, 'font-size': 11.5, fill: 'var(--text)' }, lg).textContent = 'AI route';
+    el('line', { x1: 100, x2: 122, y1: 0, y2: 0, stroke: 'var(--muted)', 'stroke-width': 2, 'stroke-dasharray': '6 5' }, lg);
+    el('text', { x: 128, y: 4, 'font-size': 11.5, fill: 'var(--text)' }, lg).textContent = 'Naive route';
+  }
+
+  /* =========================================================
+     Controls
+     ========================================================= */
+  function setHour(h) {
+    state.hour = h; $('hour').value = h;
+    $('hourVal').textContent = `${pad(h)}:00`;
+    $('condTag').textContent = periodLabel(h);
+  }
+  function setWeather(w) {
+    state.weather = w; $('weather').value = w;
+    $('weatherVal').textContent = `${w} / 10`;
+    $('weatherDesc').textContent = weatherLabel(w);
+  }
+  function syncSelects() {
+    [...$('dst').options].forEach(o => o.disabled = o.value === state.src);
+    [...$('src').options].forEach(o => o.disabled = o.value === state.dst);
+  }
+  function populateSelects() {
+    for (const id of ['src', 'dst']) {
+      const s = $(id);
+      NODES.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; s.appendChild(o); });
+    }
+    $('src').value = state.src; $('dst').value = state.dst; syncSelects();
+  }
+
+  $('hour').addEventListener('input', e => { setHour(+e.target.value); dispatch({ quiet: true, animate: false }); });
+  $('hour').addEventListener('change', () => dispatch());
+  $('weather').addEventListener('input', e => { setWeather(+e.target.value); dispatch({ quiet: true, animate: false }); });
+  $('weather').addEventListener('change', () => dispatch());
+  $('src').addEventListener('change', e => { state.src = e.target.value; syncSelects(); dispatch(); });
+  $('dst').addEventListener('change', e => { state.dst = e.target.value; syncSelects(); dispatch(); });
+  $('dispatchBtn').addEventListener('click', () => dispatch());
+  document.querySelectorAll('.presets .chip-btn').forEach(b => b.addEventListener('click', () => {
+    setHour(+b.dataset.h); setWeather(+b.dataset.w); log(`Preset applied: ${b.textContent}`); dispatch();
+  }));
+  $('clearBlocksBtn').addEventListener('click', () => {
+    if (!state.blocked.size) return;
+    state.blocked.clear(); log('All roads reopened.', 'ok'); dispatch();
+  });
+  $('retrainBtn').addEventListener('click', () => { trainModel(); dispatch(); });
+  $('addRowBtn').addEventListener('click', () => {
+    state.train.push([state.hour, state.weather, 80, 1.5]); renderTrainTable();
+    const w = document.querySelector('.train-wrap'); w.scrollTop = w.scrollHeight;
+    log(`Added training sample [${state.hour}, ${state.weather}, 80] → 1.5. Edit values, then retrain.`);
+  });
+  $('resetDataBtn').addEventListener('click', () => {
+    state.train = DEFAULT_TRAIN.map(r => r.slice()); renderTrainTable();
+    $('nEst').value = 50; $('seed').value = 42;
+    trainModel(); dispatch();
+  });
+  $('clearLogBtn').addEventListener('click', () => { $('console').innerHTML = ''; });
+
+  $('playBtn').addEventListener('click', () => {
+    if (state.playing) return stopPlay();
+    state.playing = true; $('playBtn').textContent = '■ Stop simulation';
+    log(`Simulating a full day at weather ${state.weather}/10...`, 'info');
+    let h = 0; setHour(h); dispatch({ quiet: true });
+    state.playTimer = setInterval(() => {
+      h++;
+      if (h > 23) { stopPlay(); log('Simulation complete.', 'ok'); return; }
+      setHour(h); dispatch({ quiet: true });
+      log(`${pad(h)}:00  ETA ${state.ai ? state.ai.dist.toFixed(2) + ' min via ' + state.ai.path.join(' -> ') : 'no route'}`);
+    }, 900);
+  });
+  function stopPlay() {
+    clearInterval(state.playTimer); state.playing = false;
+    $('playBtn').textContent = '▶ Simulate 24 h';
+  }
+
+  /* =========================================================
+     Theme
+     ========================================================= */
+  const SUN = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  const MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    $('themeIcon').innerHTML = t === 'dark' ? SUN : MOON;
+    $('themeLabel').textContent = t === 'dark' ? 'Light' : 'Dark';
+    try { localStorage.setItem('rapidroute-theme', t); } catch (e) {}
+  }
+  let saved = null;
+  try { saved = localStorage.getItem('rapidroute-theme'); } catch (e) {}
+  applyTheme(saved || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  $('themeToggle').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    log(`Switched to ${next} mode.`);
+  });
+
+  /* =========================================================
+     Init
+     ========================================================= */
+  populateSelects();
+  setHour(state.hour); setWeather(state.weather);
+  renderTrainTable();
+  trainModel();
+  dispatch();
+})();
+</script>
+</body>
+</html>
